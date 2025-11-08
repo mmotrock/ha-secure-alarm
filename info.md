@@ -1,7 +1,7 @@
 # Secure Alarm System
 
-[![GitHub Release](https://img.shields.io/github/release/yourusername/ha-secure-alarm.svg?style=for-the-badge)](https://github.com/yourusername/ha-secure-alarm/releases)
-[![License](https://img.shields.io/github/license/yourusername/ha-secure-alarm.svg?style=for-the-badge)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/release/mmotrock/ha-secure-alarm.svg?style=for-the-badge)](https://github.com/mmotrock/ha-secure-alarm/releases)
+[![License](https://img.shields.io/github/license/mmotrock/ha-secure-alarm.svg?style=for-the-badge)](LICENSE)
 [![hacs](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
 
 Professional-grade security system integration for Home Assistant with dedicated authentication, comprehensive audit logging, and support for wired sensors via ESP32.
@@ -93,7 +93,7 @@ Professional-grade security system integration for Home Assistant with dedicated
    - Copy card files to `/config/www/`
    - Add to Lovelace dashboard
 
-See [full installation guide](https://github.com/yourusername/ha-secure-alarm/blob/main/README.md) for detailed instructions.
+See [full installation guide](https://github.com/mmotrock/ha-secure-alarm/blob/main/README.md) for detailed instructions.
 
 ## 📊 Entities Created
 
@@ -181,25 +181,25 @@ entry_points:
 
 ## 📚 Documentation
 
-- [Installation Guide](https://github.com/yourusername/ha-secure-alarm/blob/main/docs/INSTALLATION.md)
-- [Configuration Guide](https://github.com/yourusername/ha-secure-alarm/blob/main/docs/CONFIGURATION.md)
-- [Hardware Setup](https://github.com/yourusername/ha-secure-alarm/blob/main/docs/HARDWARE.md)
-- [API Reference](https://github.com/yourusername/ha-secure-alarm/blob/main/docs/API.md)
-- [Troubleshooting](https://github.com/yourusername/ha-secure-alarm/blob/main/docs/TROUBLESHOOTING.md)
+- [Installation Guide](https://github.com/mmotrock/ha-secure-alarm/blob/main/docs/INSTALLATION.md)
+- [Configuration Guide](https://github.com/mmotrock/ha-secure-alarm/blob/main/docs/CONFIGURATION.md)
+- [Hardware Setup](https://github.com/mmotrock/ha-secure-alarm/blob/main/docs/HARDWARE.md)
+- [API Reference](https://github.com/mmotrock/ha-secure-alarm/blob/main/docs/API.md)
+- [Troubleshooting](https://github.com/mmotrock/ha-secure-alarm/blob/main/docs/TROUBLESHOOTING.md)
 
 ## 🐛 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ha-secure-alarm/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ha-secure-alarm/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mmotrock/ha-secure-alarm/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mmotrock/ha-secure-alarm/discussions)
 - **Community Forum**: [Home Assistant Community](https://community.home-assistant.io/)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](https://github.com/yourusername/ha-secure-alarm/blob/main/CONTRIBUTING.md) first.
+Contributions are welcome! Please read our [Contributing Guide](https://github.com/mmotrock/ha-secure-alarm/blob/main/CONTRIBUTING.md) first.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/yourusername/ha-secure-alarm/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/mmotrock/ha-secure-alarm/blob/main/LICENSE) file for details.
 
 ## 🙏 Credits
 

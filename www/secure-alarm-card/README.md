@@ -322,8 +322,8 @@ Check for updates:
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ha-secure-alarm/issues)
-- **Feature Requests**: [Discussions](https://github.com/yourusername/ha-secure-alarm/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mmotrock/ha-secure-alarm/issues)
+- **Feature Requests**: [Discussions](https://github.com/mmotrock/ha-secure-alarm/discussions)
 - **Community**: [Home Assistant Forum](https://community.home-assistant.io/)
 
 ## Contributing

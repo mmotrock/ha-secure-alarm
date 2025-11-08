@@ -31,7 +31,7 @@ Complete documentation for the Secure Alarm System Home Assistant integration.
 
 # Or Manual
 cd /config
-git clone https://github.com/yourusername/ha-secure-alarm.git
+git clone https://github.com/mmotrock/ha-secure-alarm.git
 cp -r ha-secure-alarm/custom_components/secure_alarm custom_components/
 ```
 
@@ -400,9 +400,9 @@ VACUUM;
 - Review [API Reference](API.md) for details
 
 ### Community Support
-- [GitHub Discussions](https://github.com/yourusername/ha-secure-alarm/discussions) - Questions and ideas
+- [GitHub Discussions](https://github.com/mmotrock/ha-secure-alarm/discussions) - Questions and ideas
 - [Home Assistant Forum](https://community.home-assistant.io/) - General HA help
-- [GitHub Issues](https://github.com/yourusername/ha-secure-alarm/issues) - Bug reports only
+- [GitHub Issues](https://github.com/mmotrock/ha-secure-alarm/issues) - Bug reports only
 
 ### Before Asking
 1. Check documentation
