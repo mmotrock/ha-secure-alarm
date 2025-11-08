@@ -1,0 +1,195 @@
+# Automation to configure zones in the Secure Alarm System
+# Place this in: config/blueprints/automation/secure_alarm/
+blueprint:
+  name: Secure Alarm - Configure Zones
+  description: Configure zones for the Secure Alarm System integration
+  domain: automation
+  input:
+    zone_1_entity:
+      name: Zone 1 Entity
+      description: Entity ID for zone 1 (Front Door)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: door
+    zone_1_type:
+      name: Zone 1 Type
+      description: Zone type (entry zones have delay, perimeter/interior trigger immediately)
+      default: entry
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_1_enabled_home:
+      name: Zone 1 - Monitor when Armed Home
+      description: Should this zone be monitored when armed home?
+      default: false
+      selector:
+        boolean:
+    
+    zone_2_entity:
+      name: Zone 2 Entity
+      description: Entity ID for zone 2 (Back Door)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: door
+    zone_2_type:
+      name: Zone 2 Type
+      default: entry
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_2_enabled_home:
+      name: Zone 2 - Monitor when Armed Home
+      default: false
+      selector:
+        boolean:
+    
+    zone_3_entity:
+      name: Zone 3 Entity
+      description: Entity ID for zone 3 (Garage Door)
+      selector:
+        entity:
+          domain: binary_sensor
+    zone_3_type:
+      name: Zone 3 Type
+      default: entry
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_3_enabled_home:
+      name: Zone 3 - Monitor when Armed Home
+      default: false
+      selector:
+        boolean:
+    
+    zone_4_entity:
+      name: Zone 4 Entity
+      description: Entity ID for zone 4 (Living Room Window)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+    zone_4_type:
+      name: Zone 4 Type
+      default: perimeter
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_4_enabled_home:
+      name: Zone 4 - Monitor when Armed Home
+      default: false
+      selector:
+        boolean:
+    
+    zone_5_entity:
+      name: Zone 5 Entity
+      description: Entity ID for zone 5 (Bedroom Window)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+    zone_5_type:
+      name: Zone 5 Type
+      default: perimeter
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_5_enabled_home:
+      name: Zone 5 - Monitor when Armed Home
+      default: false
+      selector:
+        boolean:
+    
+    zone_6_entity:
+      name: Zone 6 Entity
+      description: Entity ID for zone 6 (Kitchen Window)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+    zone_6_type:
+      name: Zone 6 Type
+      default: perimeter
+      selector:
+        select:
+          options:
+            - entry
+            - perimeter
+            - interior
+    zone_6_enabled_home:
+      name: Zone 6 - Monitor when Armed Home
+      default: false
+      selector:
+        boolean:
+
+# This automation runs once at startup to register all zones
+trigger:
+  - platform: homeassistant
+    event: start
+
+action:
+  # Register Zone 1
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_1_entity
+      zone_type: !input zone_1_type
+      enabled_away: true
+      enabled_home: !input zone_1_enabled_home
+  
+  # Register Zone 2
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_2_entity
+      zone_type: !input zone_2_type
+      enabled_away: true
+      enabled_home: !input zone_2_enabled_home
+  
+  # Register Zone 3
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_3_entity
+      zone_type: !input zone_3_type
+      enabled_away: true
+      enabled_home: !input zone_3_enabled_home
+  
+  # Register Zone 4
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_4_entity
+      zone_type: !input zone_4_type
+      enabled_away: true
+      enabled_home: !input zone_4_enabled_home
+  
+  # Register Zone 5
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_5_entity
+      zone_type: !input zone_5_type
+      enabled_away: true
+      enabled_home: !input zone_5_enabled_home
+  
+  # Register Zone 6
+  - service: python_script.register_alarm_zone
+    data:
+      entity_id: !input zone_6_entity
+      zone_type: !input zone_6_type
+      enabled_away: true
+      enabled_home: !input zone_6_enabled_home
+
+mode: single

@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    name: Create Release Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create distribution package
+        run: |
+          mkdir -p dist/secure_alarm
+          cp -r custom_components dist/secure_alarm/
+          cp -r esphome dist/secure_alarm/
+          cp -r blueprints dist/secure_alarm/
+          cp -r python_scripts dist/secure_alarm/
+          cp -r www dist/secure_alarm/
+          cp -r examples dist/secure_alarm/
+          cp -r docs dist/secure_alarm/
+          cp README.md dist/secure_alarm/
+          cp LICENSE dist/secure_alarm/
+          cd dist && zip -r secure_alarm_${{ steps.version.outputs.version }}.zip secure_alarm/
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./dist/secure_alarm_${{ steps.version.outputs.version }}.zip
+          asset_name: secure_alarm_${{ steps.version.outputs.version }}.zip
+          asset_content_type: application/zip

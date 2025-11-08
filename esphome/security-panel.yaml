@@ -1,0 +1,185 @@
+# ESPHome configuration for Secure Alarm System
+# Hardware: Olimex ESP32-POE or WT32-ETH01
+# 6 wired door/window sensor zones
+
+esphome:
+  name: security-panel
+  friendly_name: Security Panel
+  platform: ESP32
+  board: esp32-poe
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+# OTA updates
+ota:
+  password: !secret ota_password
+
+# Ethernet configuration for ESP32-POE
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  power_pin: GPIO12
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO33
+    inverted: true
+
+# Binary sensors for 6 zones
+# Connect your wired sensors to these GPIO pins
+# Most sensors are Normally Closed (NC) - circuit closes when door/window is closed
+binary_sensor:
+  # Zone 1 - Front Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO32
+      mode: INPUT_PULLUP
+      inverted: true  # true for NC sensors
+    name: "Front Door"
+    id: zone_1_front_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 1: Front Door opened"
+    on_release:
+      then:
+        - logger.log: "Zone 1: Front Door closed"
+
+  # Zone 2 - Back Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO25
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Back Door"
+    id: zone_2_back_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 2: Back Door opened"
+
+  # Zone 3 - Garage Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO26
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Garage Door"
+    id: zone_3_garage_door
+    device_class: garage_door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 3: Garage Door opened"
+
+  # Zone 4 - Living Room Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO27
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Living Room Window"
+    id: zone_4_living_room_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 4: Living Room Window opened"
+
+  # Zone 5 - Bedroom Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Bedroom Window"
+    id: zone_5_bedroom_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 5: Bedroom Window opened"
+
+  # Zone 6 - Kitchen Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Kitchen Window"
+    id: zone_6_kitchen_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 6: Kitchen Window opened"
+
+# System sensors
+sensor:
+  # WiFi/Network signal strength
+  - platform: wifi_signal
+    name: "Security Panel Signal"
+    update_interval: 60s
+
+  # Uptime sensor
+  - platform: uptime
+    name: "Security Panel Uptime"
+
+# Text sensors
+text_sensor:
+  # ESPHome version
+  - platform: version
+    name: "Security Panel ESPHome Version"
+  
+  # WiFi info
+  - platform: wifi_info
+    ip_address:
+      name: "Security Panel IP Address"
+    mac_address:
+      name: "Security Panel MAC Address"
+
+# Switches (optional - for siren, strobe, etc.)
+switch:
+  # Output for alarm siren
+  - platform: gpio
+    pin: GPIO15
+    name: "Alarm Siren"
+    id: alarm_siren
+    restore_mode: ALWAYS_OFF
+    
+  # Output for strobe light
+  - platform: gpio
+    pin: GPIO4
+    name: "Alarm Strobe"
+    id: alarm_strobe
+    restore_mode: ALWAYS_OFF
+
+# Restart button
+button:
+  - platform: restart
+    name: "Security Panel Restart"

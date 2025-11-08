@@ -1,0 +1,12 @@
+# Complete Alarm Dashboard Example
+
+title: Security System
+views:
+  - title: Alarm
+    path: alarm
+    icon: mdi:shield-home
+    cards:
+      # Main alarm badge card
+      - type: custom:secure-alarm-card
+        entity: alarm_control_panel.secure_alarm
+        entry_points

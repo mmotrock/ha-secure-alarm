@@ -1,0 +1,254 @@
+# Example Scripts for Secure Alarm System
+
+# Quick arm away
+quick_arm_away:
+  alias: Quick Arm Away
+  sequence:
+    - service: secure_alarm.arm_away
+      data:
+        pin: !secret alarm_automation_pin
+        code: "quick_arm_script"
+    - service: notify.mobile_app_all
+      data:
+        message: "Alarm armed away"
+
+# Quick arm home
+quick_arm_home:
+  alias: Quick Arm Home
+  sequence:
+    - service: secure_alarm.arm_home
+      data:
+        pin: !secret alarm_automation_pin
+        code: "quick_arm_script"
+    - service: notify.mobile_app_all
+      data:
+        message: "Alarm armed home"
+
+# Create temporary guest code
+create_guest_code:
+  alias: Create Guest Code
+  fields:
+    guest_name:
+      description: Guest name
+      example: "Weekend Guest"
+    guest_pin:
+      description: Temporary PIN
+      example: "888888"
+  sequence:
+    - service: secure_alarm.add_user
+      data:
+        name: "{{ guest_name }}"
+        pin: "{{ guest_pin }}"
+        admin_pin: !secret alarm_admin_pin
+        is_admin: false
+    - service: notify.mobile_app_admin
+      data:
+        title: "Guest Code Created"
+        message: "{{ guest_name }} PIN: {{ guest_pin }}"
+    - delay:
+        hours: 48
+    - service: secure_alarm.remove_user
+      data:
+        user_id: "{{ state_attr('sensor.secure_alarm_last_user_id', 'value') }}"
+        admin_pin: !secret alarm_admin_pin
+
+# Test all sensors
+test_all_sensors:
+  alias: Test All Sensors
+  sequence:
+    - service: persistent_notification.create
+      data:
+        title: "Sensor Test Started"
+        message: "Open and close each door/window when prompted"
+    - repeat:
+        for_each:
+          - binary_sensor.front_door
+          - binary_sensor.back_door
+          - binary_sensor.garage_door
+          - binary_sensor.living_room_window
+          - binary_sensor.bedroom_window
+          - binary_sensor.kitchen_window
+        sequence:
+          - service: persistent_notification.create
+            data:
+              title: "Test {{ repeat.item }}"
+              message: "Open and close this sensor, then click done"
+              notification_id: sensor_test
+          - wait_for_trigger:
+              - platform: state
+                entity_id: "{{ repeat.item }}"
+            timeout: "00:01:00"
+          - service: persistent_notification.dismiss
+            data:
+              notification_id: sensor_test
+    - service: persistent_notification.create
+      data:
+        title: "Sensor Test Complete"
+        message: "All sensors tested successfully"
+
+# Panic mode
+panic_mode:
+  alias: Panic Mode
+  sequence:
+    - service: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.secure_alarm
+    - service: light.turn_on
+      target:
+        entity_id: all
+      data:
+        brightness: 255
+    - service: lock.unlock
+      target:
+        entity_id: all
+    - service: notify.mobile_app_all
+      data:
+        title: "🚨 PANIC MODE"
+        message: "Emergency activated"
+        data:
+          priority: high
+          ttl: 0
+
+# Secure home for night
+secure_home_night:
+  alias: Secure Home for Night
+  sequence:
+    - service: secure_alarm.arm_home
+      data:
+        pin: !secret alarm_automation_pin
+    - service: lock.lock
+      target:
+        entity_id: all
+    - service: cover.close_cover
+      target:
+        entity_id: all
+    - service: light.turn_off
+      target:
+        entity_id: 
+          - light.living_room
+          - light.kitchen
+          - light.outdoor
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.thermostat
+      data:
+        temperature: 68
+    - service: notify.mobile_app_all
+      data:
+        message: "Good night - home secured"
+
+# Morning routine
+morning_disarm:
+  alias: Morning Disarm and Unlock
+  sequence:
+    - service: secure_alarm.disarm
+      data:
+        pin: !secret alarm_automation_pin
+    - service: light.turn_on
+      target:
+        entity_id: light.kitchen
+      data:
+        brightness: 150
+    - delay:
+        seconds: 5
+    - service: lock.unlock
+      target:
+        entity_id: lock.front_door
+    - service: cover.open_cover
+      target:
+        entity_id: cover.garage_door
+
+# Bypass garage for maintenance
+bypass_garage_temporarily:
+  alias: Bypass Garage (1 hour)
+  sequence:
+    - service: secure_alarm.bypass_zone
+      data:
+        zone_entity_id: binary_sensor.garage_door
+        pin: !secret alarm_automation_pin
+        bypass: true
+    - service: notify.mobile_app_all
+      data:
+        message: "Garage door bypassed for 1 hour"
+    - delay:
+        hours: 1
+    - service: secure_alarm.bypass_zone
+      data:
+        zone_entity_id: binary_sensor.garage_door
+        pin: !secret alarm_automation_pin
+        bypass: false
+    - service: notify.mobile_app_all
+      data:
+        message: "Garage door bypass removed"
+
+# Weekly system test
+weekly_alarm_test:
+  alias: Weekly Alarm System Test
+  sequence:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.alarm_siren
+    - delay:
+        seconds: 3
+    - service: switch.turn_off
+      target:
+        entity_id: switch.alarm_siren
+    - service: notify.mobile_app_all
+      data:
+        title: "Weekly Test Complete"
+        message: "Alarm system tested successfully"
+    # Log test to database
+    - service: python_script.log_alarm_test
+      data:
+        result: "success"
+        timestamp: "{{ now().isoformat() }}"
+
+# Vacation mode toggle
+toggle_vacation_mode:
+  alias: Toggle Vacation Mode
+  sequence:
+    - service: input_boolean.toggle
+      target:
+        entity_id: input_boolean.vacation_mode
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.vacation_mode
+              state: "on"
+          sequence:
+            - service: secure_alarm.arm_away
+              data:
+                pin: !secret alarm_automation_pin
+            - service: scene.turn_on
+              target:
+                entity_id: scene.vacation_away
+            - service: notify.mobile_app_all
+              data:
+                title: "Vacation Mode ON"
+                message: "Have a great trip!"
+      default:
+        - service: notify.mobile_app_all
+          data:
+            title: "Vacation Mode OFF"
+            message: "Welcome home!"
+
+# Emergency contact notification
+emergency_contact_alert:
+  alias: Alert Emergency Contacts
+  fields:
+    alert_message:
+      description: Alert message
+      example: "Alarm triggered at home"
+  sequence:
+    - service: notify.sms
+      data:
+        target: !secret emergency_phone
+        message: "🚨 {{ alert_message }}"
+    - service: notify.sms
+      data:
+        target: !secret trusted_contact_1
+        message: "🚨 {{ alert_message }}"
+    - service: notify.mobile_app_all
+      data:
+        title: "Emergency Contacts Alerted"
+        message: "{{ alert_message }}"

@@ -1,0 +1,307 @@
+# ESPHome configuration for Secure Alarm System - 12 Zone Expansion
+# Hardware: Olimex ESP32-POE + MCP23017 GPIO Expander
+# Supports up to 16 zones per MCP23017 (can chain multiple)
+
+esphome:
+  name: security-panel-expanded
+  friendly_name: Security Panel Expanded
+  platform: ESP32
+  board: esp32-poe
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+# OTA updates
+ota:
+  password: !secret ota_password
+
+# Ethernet configuration for ESP32-POE
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  power_pin: GPIO12
+
+# I2C bus for GPIO expander
+i2c:
+  sda: GPIO13
+  scl: GPIO16
+  scan: true
+  id: bus_a
+
+# MCP23017 GPIO Expander (adds 16 additional GPIO pins)
+mcp23017:
+  - id: mcp23017_hub
+    address: 0x20  # Default I2C address (can use 0x20-0x27 for up to 8 expanders)
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO33
+    inverted: true
+
+# Binary sensors for zones
+# First 6 zones use ESP32 GPIO directly
+binary_sensor:
+  # ===== DIRECT GPIO ZONES (1-6) =====
+  
+  # Zone 1 - Front Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO32
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Front Door"
+    id: zone_1_front_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - logger.log: "Zone 1: Front Door opened"
+
+  # Zone 2 - Back Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO25
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Back Door"
+    id: zone_2_back_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 3 - Garage Door (Entry type)
+  - platform: gpio
+    pin:
+      number: GPIO26
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Garage Door"
+    id: zone_3_garage_door
+    device_class: garage_door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 4 - Living Room Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO27
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Living Room Window"
+    id: zone_4_living_room_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 5 - Bedroom Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Bedroom Window"
+    id: zone_5_bedroom_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 6 - Kitchen Window (Perimeter type)
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Kitchen Window"
+    id: zone_6_kitchen_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # ===== MCP23017 EXPANDER ZONES (7-12) =====
+  
+  # Zone 7 - Basement Door (Entry type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 0
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Basement Door"
+    id: zone_7_basement_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 8 - Side Door (Entry type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 1
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Side Door"
+    id: zone_8_side_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 9 - Office Window (Perimeter type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 2
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Office Window"
+    id: zone_9_office_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 10 - Dining Room Window (Perimeter type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 3
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Dining Room Window"
+    id: zone_10_dining_room_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 11 - Basement Window (Perimeter type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 4
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Basement Window"
+    id: zone_11_basement_window
+    device_class: window
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Zone 12 - Sliding Door (Entry type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 5
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Sliding Door"
+    id: zone_12_sliding_door
+    device_class: door
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Glass break sensor (Interior type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 6
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Glass Break Sensor"
+    id: glass_break_sensor
+    device_class: safety
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  # Motion detector (Interior type)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 7
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Motion Detector Living Room"
+    id: motion_living_room
+    device_class: motion
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: 5s
+
+# System sensors
+sensor:
+  - platform: wifi_signal
+    name: "Security Panel Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Security Panel Uptime"
+
+# Text sensors
+text_sensor:
+  - platform: version
+    name: "Security Panel ESPHome Version"
+  
+  - platform: wifi_info
+    ip_address:
+      name: "Security Panel IP Address"
+    mac_address:
+      name: "Security Panel MAC Address"
+
+# Switches for outputs
+switch:
+  # Output for alarm siren
+  - platform: gpio
+    pin: GPIO15
+    name: "Alarm Siren"
+    id: alarm_siren
+    restore_mode: ALWAYS_OFF
+    
+  # Output for strobe light
+  - platform: gpio
+    pin: GPIO4
+    name: "Alarm Strobe"
+    id: alarm_strobe
+    restore_mode: ALWAYS_OFF
+  
+  # Additional outputs via MCP23017
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 15
+      mode: OUTPUT
+    name: "Exterior Lights"
+    id: exterior_lights
+    restore_mode: ALWAYS_OFF
+
+# Restart button
+button:
+  - platform: restart
+    name: "Security Panel Restart"
+
+# Notes for expansion:
+# - MCP23017 provides 16 GPIO pins (GPA0-GPA7, GPB0-GPB7)
+# - Can chain up to 8 MCP23017 chips (addresses 0x20-0x27)
+# - This gives up to 128 additional GPIO pins
+# - Current config uses 9 of 16 pins (7 zones + 1 motion + 1 output)
+# - Remaining 7 pins available for additional zones/outputs

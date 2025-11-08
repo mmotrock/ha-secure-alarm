@@ -1,0 +1,34 @@
+# Example Notification Configurations
+
+# Twilio SMS
+notify:
+  - platform: twilio_sms
+    name: sms
+    account_sid: !secret twilio_account_sid
+    auth_token: !secret twilio_auth_token
+    from_number: !secret twilio_from_number
+
+# Telegram
+  - platform: telegram
+    name: telegram
+    chat_id: !secret telegram_chat_id
+
+# Pushover (high priority)
+  - platform: pushover
+    name: pushover
+    api_key: !secret pushover_api_key
+    user_key: !secret pushover_user_key
+
+# Email
+  - platform: smtp
+    name: email_alert
+    server: smtp.gmail.com
+    port: 587
+    timeout: 15
+    sender: !secret email_sender
+    encryption: starttls
+    username: !secret email_username
+    password: !secret email_password
+    recipient:
+      - !secret email_recipient
+    sender_name: Home Alarm System

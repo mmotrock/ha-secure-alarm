@@ -1,0 +1,449 @@
+# Example Automations for Secure Alarm System
+# Copy these to your automations.yaml or create via UI
+
+# ============================================
+# AUTOMATIC ARMING/DISARMING
+# ============================================
+
+# Auto-arm away when everyone leaves
+- id: alarm_auto_arm_away
+  alias: "Alarm: Auto Arm Away When Everyone Leaves"
+  trigger:
+    - platform: state
+      entity_id: group.all_persons
+      to: "not_home"
+      for: "00:05:00"  # Wait 5 minutes
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "disarmed"
+  action:
+    - service: secure_alarm.arm_away
+      data:
+        pin: !secret alarm_automation_pin
+        code: "auto_arm"
+    - service: notify.mobile_app_all
+      data:
+        title: "🏠 Security Alert"
+        message: "Alarm armed away - everyone left"
+
+# Auto-disarm when first person arrives home
+- id: alarm_auto_disarm_home
+  alias: "Alarm: Auto Disarm When Someone Arrives"
+  trigger:
+    - platform: state
+      entity_id: group.all_persons
+      to: "home"
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "armed_away"
+  action:
+    - service: secure_alarm.disarm
+      data:
+        pin: !secret alarm_automation_pin
+        code: "auto_disarm"
+    - service: notify.mobile_app_all
+      data:
+        title: "🏠 Security Alert"
+        message: "Alarm disarmed - someone arrived home"
+
+# Arm home at bedtime
+- id: alarm_arm_home_bedtime
+  alias: "Alarm: Arm Home at Bedtime"
+  trigger:
+    - platform: time
+      at: "23:00:00"
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "disarmed"
+    - condition: state
+      entity_id: group.all_persons
+      state: "home"
+  action:
+    - service: secure_alarm.arm_home
+      data:
+        pin: !secret alarm_automation_pin
+        code: "bedtime"
+    - service: notify.mobile_app_all
+      data:
+        title: "😴 Good Night"
+        message: "Alarm armed home - perimeter secured"
+
+# Disarm in the morning
+- id: alarm_disarm_morning
+  alias: "Alarm: Disarm in the Morning"
+  trigger:
+    - platform: time
+      at: "07:00:00"
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "armed_home"
+    - condition: state
+      entity_id: binary_sensor.workday_sensor
+      state: "on"
+  action:
+    - service: secure_alarm.disarm
+      data:
+        pin: !secret alarm_automation_pin
+        code: "morning"
+
+# ============================================
+# ALARM TRIGGER RESPONSES
+# ============================================
+
+# Send notifications on alarm trigger
+- id: alarm_trigger_notify
+  alias: "Alarm: Send Notifications on Trigger"
+  trigger:
+    - platform: event
+      event_type: secure_alarm_triggered
+  action:
+    # Mobile notification with high priority
+    - service: notify.mobile_app_all
+      data:
+        title: "🚨 ALARM TRIGGERED!"
+        message: "Zone: {{ trigger.event.data.zone }}"
+        data:
+          priority: high
+          ttl: 0
+          channel: alarm
+          actions:
+            - action: "DISARM_ALARM"
+              title: "Disarm"
+            - action: "VIEW_CAMERAS"
+              title: "View Cameras"
+    
+    # SMS notification
+    - service: notify.sms
+      data:
+        target: !secret emergency_phone
+        message: "ALARM TRIGGERED at {{ now().strftime('%I:%M %p') }} - Zone: {{ trigger.event.data.zone }}"
+    
+    # Flash lights
+    - service: light.turn_on
+      target:
+        entity_id: light.all_lights
+      data:
+        brightness: 255
+        flash: long
+    
+    # Turn on all cameras
+    - service: camera.turn_on
+      target:
+        entity_id: all
+
+# Take camera snapshots on trigger
+- id: alarm_trigger_camera_snapshot
+  alias: "Alarm: Take Camera Snapshots on Trigger"
+  trigger:
+    - platform: event
+      event_type: secure_alarm_triggered
+  action:
+    - service: camera.snapshot
+      target:
+        entity_id: camera.front_door
+      data:
+        filename: "/config/www/snapshots/alarm_{{ now().strftime('%Y%m%d_%H%M%S') }}_front.jpg"
+    
+    - service: camera.snapshot
+      target:
+        entity_id: camera.back_door
+      data:
+        filename: "/config/www/snapshots/alarm_{{ now().strftime('%Y%m%d_%H%M%S') }}_back.jpg"
+    
+    # Send snapshots via notification
+    - delay: "00:00:02"
+    - service: notify.mobile_app_all
+      data:
+        message: "Camera snapshots captured"
+        data:
+          image: "/local/snapshots/alarm_{{ now().strftime('%Y%m%d_%H%M%S') }}_front.jpg"
+
+# Sound siren on trigger (via ESPHome switch)
+- id: alarm_trigger_siren
+  alias: "Alarm: Activate Siren on Trigger"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+      to: "triggered"
+  action:
+    # Turn on siren
+    - service: switch.turn_on
+      target:
+        entity_id: switch.alarm_siren
+    
+    # Turn on strobe
+    - service: switch.turn_on
+      target:
+        entity_id: switch.alarm_strobe
+    
+    # Turn off after 5 minutes
+    - delay: "00:05:00"
+    - service: switch.turn_off
+      target:
+        entity_id: 
+          - switch.alarm_siren
+          - switch.alarm_strobe
+
+# ============================================
+# DURESS CODE HANDLING
+# ============================================
+
+# Emergency response for duress code
+- id: alarm_duress_code_used
+  alias: "Alarm: DURESS CODE USED - Silent Alert"
+  trigger:
+    - platform: event
+      event_type: secure_alarm_duress_code_used
+  action:
+    # Silent SMS to trusted contacts
+    - service: notify.sms
+      data:
+        target: !secret trusted_contact_1
+        message: "DURESS CODE USED by {{ trigger.event.data.user_name }} at {{ now().strftime('%I:%M %p') }} - Silent alarm"
+    
+    - service: notify.sms
+      data:
+        target: !secret trusted_contact_2
+        message: "DURESS CODE USED - Check on household immediately"
+    
+    # Silent mobile notification (no sound/vibration)
+    - service: notify.mobile_app_trusted_device
+      data:
+        title: "⚠️ DURESS CODE USED"
+        message: "{{ trigger.event.data.user_name }} used duress code"
+        data:
+          priority: high
+          ttl: 0
+          channel: duress_silent
+          vibrationPattern: "0,0"  # No vibration
+    
+    # Log to separate duress file
+    - service: notify.duress_log
+      data:
+        message: "{{ now().isoformat() }} - Duress code used by {{ trigger.event.data.user_name }}"
+
+# ============================================
+# FAILED ATTEMPT MONITORING
+# ============================================
+
+# Alert on multiple failed attempts
+- id: alarm_failed_attempts_alert
+  alias: "Alarm: Alert on Multiple Failed Attempts"
+  trigger:
+    - platform: state
+      entity_id: sensor.secure_alarm_failed_login_attempts
+  condition:
+    - condition: numeric_state
+      entity_id: sensor.secure_alarm_failed_login_attempts
+      above: 2
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "⚠️ Security Warning"
+        message: "{{ states('sensor.secure_alarm_failed_login_attempts') }} failed PIN attempts detected"
+        data:
+          priority: high
+
+# System lockout notification
+- id: alarm_lockout_notification
+  alias: "Alarm: System Lockout Notification"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.secure_alarm_locked_out
+      to: "on"
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "🔒 SYSTEM LOCKED OUT"
+        message: "Alarm system locked due to multiple failed attempts. Will unlock in 5 minutes."
+        data:
+          priority: high
+
+# ============================================
+# ZONE MANAGEMENT
+# ============================================
+
+# Auto-bypass garage zone when working in garage
+- id: alarm_auto_bypass_garage
+  alias: "Alarm: Auto Bypass Garage During Work"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.working_in_garage
+      to: "on"
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "disarmed"
+  action:
+    - service: secure_alarm.bypass_zone
+      data:
+        zone_entity_id: binary_sensor.garage_door
+        pin: !secret alarm_automation_pin
+        bypass: true
+    - service: notify.mobile_app_all
+      data:
+        message: "Garage zone bypassed during work"
+
+# Remove bypass when done
+- id: alarm_remove_garage_bypass
+  alias: "Alarm: Remove Garage Bypass When Done"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.working_in_garage
+      to: "off"
+  action:
+    - service: secure_alarm.bypass_zone
+      data:
+        zone_entity_id: binary_sensor.garage_door
+        pin: !secret alarm_automation_pin
+        bypass: false
+    - service: notify.mobile_app_all
+      data:
+        message: "Garage zone bypass removed"
+
+# ============================================
+# MAINTENANCE & MONITORING
+# ============================================
+
+# Weekly audit report
+- id: alarm_weekly_audit
+  alias: "Alarm: Weekly Audit Report"
+  trigger:
+    - platform: time
+      at: "09:00:00"
+    - platform: time
+      at: "09:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - sun
+  action:
+    - service: notify.mobile_app_admin
+      data:
+        title: "📊 Weekly Alarm Report"
+        message: |
+          Alarm System Status:
+          - Armed {{ states('sensor.secure_alarm_status') }} times this week
+          - {{ states('sensor.secure_alarm_failed_login_attempts') }} failed attempts
+          - Last changed by: {{ states('sensor.secure_alarm_last_changed_by') }}
+          - Active zones: {{ states('sensor.secure_alarm_active_zones') }}
+
+# Low battery alert for sensors
+- id: alarm_sensor_battery_low
+  alias: "Alarm: Sensor Battery Low Alert"
+  trigger:
+    - platform: numeric_state
+      entity_id: 
+        - sensor.security_panel_battery  # If using battery backup
+      below: 20
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "🔋 Low Battery Warning"
+        message: "Security panel battery is low ({{ states('sensor.security_panel_battery') }}%)"
+
+# Sensor offline alert
+- id: alarm_sensor_offline
+  alias: "Alarm: Sensor Offline Alert"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.front_door
+      to: "unavailable"
+      for: "00:05:00"
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "⚠️ Sensor Offline"
+        message: "Front door sensor is offline - check ESPHome device"
+
+# ============================================
+# ACTIONABLE NOTIFICATIONS
+# ============================================
+
+# Handle notification actions
+- id: alarm_handle_notification_actions
+  alias: "Alarm: Handle Notification Actions"
+  trigger:
+    - platform: event
+      event_type: mobile_app_notification_action
+  action:
+    - choose:
+        # Disarm action
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'DISARM_ALARM' }}"
+          sequence:
+            - service: secure_alarm.disarm
+              data:
+                pin: !secret alarm_automation_pin
+                code: "notification_action"
+        
+        # View cameras action
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'VIEW_CAMERAS' }}"
+          sequence:
+            - service: notify.mobile_app_{{ trigger.event.data.device_id }}
+              data:
+                message: "Opening camera view..."
+                data:
+                  url: "/lovelace/cameras"
+
+# ============================================
+# VOICE ASSISTANT INTEGRATION
+# ============================================
+
+# Alexa/Google Home arming (requires PIN via voice)
+script:
+  alarm_voice_arm_away:
+    alias: "Voice Arm Away"
+    sequence:
+      - service: secure_alarm.arm_away
+        data:
+          pin: !secret alarm_automation_pin
+          code: "voice_assistant"
+      - service: tts.google_translate_say
+        data:
+          entity_id: media_player.living_room
+          message: "Arming alarm in away mode. Exit delay started."
+
+  alarm_voice_arm_home:
+    alias: "Voice Arm Home"
+    sequence:
+      - service: secure_alarm.arm_home
+        data:
+          pin: !secret alarm_automation_pin
+          code: "voice_assistant"
+      - service: tts.google_translate_say
+        data:
+          entity_id: media_player.living_room
+          message: "Alarm armed in home mode. Perimeter secured."
+
+# ============================================
+# CONFIGURATION HELPERS
+# ============================================
+
+# Input booleans for automation control
+input_boolean:
+  alarm_auto_arm_enabled:
+    name: Enable Auto-Arm
+    icon: mdi:shield-check
+  
+  alarm_auto_disarm_enabled:
+    name: Enable Auto-Disarm
+    icon: mdi:shield-off
+  
+  working_in_garage:
+    name: Working in Garage
+    icon: mdi:garage
+
+# Secrets file additions needed:
+# secrets.yaml:
+# alarm_automation_pin: "123456"
+# emergency_phone: "+15551234567"
+# trusted_contact_1: "+15559876543"
+# trusted_contact_2: "+15558765432"

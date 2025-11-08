@@ -1,0 +1,483 @@
+# Advanced Automation Examples for Secure Alarm System
+# Additional examples beyond the basic ones
+
+# ============================================
+# VACATION MODE
+# ============================================
+
+# Auto-arm when vacation mode enabled
+- id: alarm_vacation_mode_arm
+  alias: "Alarm: Vacation Mode - Auto Arm"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.vacation_mode
+      to: "on"
+  action:
+    # Arm away immediately
+    - service: secure_alarm.arm_away
+      data:
+        pin: !secret alarm_automation_pin
+        code: "vacation_mode"
+    # Turn on vacation lighting
+    - service: scene.turn_on
+      target:
+        entity_id: scene.vacation_away
+    - service: notify.mobile_app_all
+      data:
+        title: "🏖️ Vacation Mode"
+        message: "Alarm armed, vacation settings activated"
+
+# Disable auto-disarm during vacation
+- id: alarm_vacation_prevent_auto_disarm
+  alias: "Alarm: Vacation Mode - Prevent Auto Disarm"
+  trigger:
+    - platform: state
+      entity_id: group.all_persons
+      to: "home"
+  condition:
+    - condition: state
+      entity_id: input_boolean.vacation_mode
+      state: "on"
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "⚠️ Vacation Mode Alert"
+        message: "Someone arrived home while vacation mode is active!"
+        data:
+          priority: high
+
+# ============================================
+# ZONE-SPECIFIC HANDLING
+# ============================================
+
+# Different response for different zones
+- id: alarm_zone_specific_response
+  alias: "Alarm: Zone-Specific Alert Response"
+  trigger:
+    - platform: event
+      event_type: secure_alarm_triggered
+  action:
+    - choose:
+        # Basement zones - check for flooding/water
+        - conditions:
+            - condition: template
+              value_template: "{{ 'basement' in trigger.event.data.zone.lower() }}"
+          sequence:
+            - service: switch.turn_off
+              target:
+                entity_id: switch.water_main_valve
+            - service: notify.mobile_app_all
+              data:
+                title: "🚨 Basement Alert"
+                message: "Basement zone triggered - water main shut off"
+        
+        # Garage zone - close garage, check for CO
+        - conditions:
+            - condition: template
+              value_template: "{{ 'garage' in trigger.event.data.zone.lower() }}"
+          sequence:
+            - service: cover.close_cover
+              target:
+                entity_id: cover.garage_door
+            - service: camera.snapshot
+              target:
+                entity_id: camera.garage
+              data:
+                filename: "/config/www/snapshots/garage_alert.jpg"
+        
+        # Window zones - close blinds, turn on lights
+        - conditions:
+            - condition: template
+              value_template: "{{ 'window' in trigger.event.data.zone.lower() }}"
+          sequence:
+            - service: cover.close_cover
+              target:
+                entity_id: all
+            - service: light.turn_on
+              target:
+                entity_id: all
+              data:
+                brightness: 255
+      default:
+        - service: notify.mobile_app_all
+          data:
+            title: "🚨 Alarm Triggered"
+            message: "Zone: {{ trigger.event.data.zone }}"
+
+# ============================================
+# PREDICTIVE ARMING
+# ============================================
+
+# Arm when last person leaves (by tracking devices)
+- id: alarm_predictive_arm_departure
+  alias: "Alarm: Predictive Arm on Departure"
+  trigger:
+    - platform: state
+      entity_id: 
+        - person.john
+        - person.jane
+      to: "not_home"
+  condition:
+    # All tracked persons away
+    - condition: state
+      entity_id: group.all_persons
+      state: "not_home"
+    # During typical work hours
+    - condition: time
+      after: "07:00:00"
+      before: "18:00:00"
+    # Weekday
+    - condition: state
+      entity_id: binary_sensor.workday_sensor
+      state: "on"
+  action:
+    - service: secure_alarm.arm_away
+      data:
+        pin: !secret alarm_automation_pin
+        code: "predictive_arm"
+
+# Pre-arm warning (remind to arm)
+- id: alarm_remind_to_arm
+  alias: "Alarm: Remind to Arm at Bedtime"
+  trigger:
+    - platform: time
+      at: "22:30:00"
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "disarmed"
+    - condition: state
+      entity_id: group.all_persons
+      state: "home"
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "🛡️ Alarm Reminder"
+        message: "It's bedtime. Don't forget to arm the alarm!"
+        data:
+          actions:
+            - action: "ARM_HOME_NOW"
+              title: "Arm Home"
+            - action: "DISMISS"
+              title: "Dismiss"
+
+# ============================================
+# SMART HOME INTEGRATION
+# ============================================
+
+# Adjust thermostat based on alarm state
+- id: alarm_thermostat_adjustment
+  alias: "Alarm: Adjust Thermostat on Arm/Disarm"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+  action:
+    - choose:
+        # Armed Away - set to eco mode
+        - conditions:
+            - condition: state
+              entity_id: alarm_control_panel.secure_alarm
+              state: "armed_away"
+          sequence:
+            - service: climate.set_preset_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                preset_mode: "away"
+        
+        # Disarmed - return to normal
+        - conditions:
+            - condition: state
+              entity_id: alarm_control_panel.secure_alarm
+              state: "disarmed"
+          sequence:
+            - service: climate.set_preset_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                preset_mode: "home"
+
+# Turn off appliances when arming away
+- id: alarm_appliance_safety
+  alias: "Alarm: Safety Check - Disable Appliances"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+      to: "armed_away"
+  action:
+    # Turn off potentially dangerous devices
+    - service: switch.turn_off
+      target:
+        entity_id:
+          - switch.coffee_maker
+          - switch.space_heater
+          - switch.iron
+          - switch.curling_iron
+    # Notify what was turned off
+    - service: notify.mobile_app_all
+      data:
+        title: "✅ Safety Check"
+        message: "Appliances disabled for safety while away"
+
+# ============================================
+# WEATHER-BASED AUTOMATIONS
+# ============================================
+
+# Skip auto-arm in severe weather
+- id: alarm_weather_exception
+  alias: "Alarm: Weather Exception - Skip Auto Arm"
+  trigger:
+    - platform: state
+      entity_id: group.all_persons
+      to: "not_home"
+  condition:
+    # Severe weather alert active
+    - condition: state
+      entity_id: binary_sensor.severe_weather_alert
+      state: "on"
+  action:
+    - service: notify.mobile_app_all
+      data:
+        title: "⚠️ Severe Weather"
+        message: "Auto-arm skipped due to weather alert. Please arm manually when safe."
+
+# ============================================
+# CAMERA INTEGRATION
+# ============================================
+
+# Start recording on arm
+- id: alarm_camera_record_on_arm
+  alias: "Alarm: Start Camera Recording on Arm"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+      to: 
+        - "armed_away"
+        - "armed_home"
+  action:
+    - service: camera.turn_on
+      target:
+        entity_id: all
+    - service: camera.enable_motion_detection
+      target:
+        entity_id: all
+
+# Stop recording when disarmed
+- id: alarm_camera_stop_on_disarm
+  alias: "Alarm: Stop Camera Recording on Disarm"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+      to: "disarmed"
+  action:
+    - service: camera.disable_motion_detection
+      target:
+        entity_id: all
+
+# Time-lapse on trigger
+- id: alarm_camera_timelapse
+  alias: "Alarm: Create Timelapse on Trigger"
+  trigger:
+    - platform: state
+      entity_id: alarm_control_panel.secure_alarm
+      to: "triggered"
+  action:
+    - repeat:
+        count: 30  # 30 snapshots
+        sequence:
+          - service: camera.snapshot
+            target:
+              entity_id: camera.front_door
+            data:
+              filename: "/config/www/timelapse/alarm_{{ now().strftime('%Y%m%d_%H%M%S') }}_{{ repeat.index }}.jpg"
+          - delay:
+              seconds: 2
+
+# ============================================
+# PRESENCE SIMULATION
+# ============================================
+
+# Simulate presence when armed away
+- id: alarm_presence_simulation
+  alias: "Alarm: Presence Simulation"
+  trigger:
+    - platform: time_pattern
+      minutes: "/15"  # Every 15 minutes
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.secure_alarm
+      state: "armed_away"
+    - condition: sun
+      after: sunset
+      before: sunrise
+  action:
+    # Random light
+    - service: light.turn_on
+      target:
+        entity_id: >
+          {{ ['light.living_room', 'light.bedroom', 'light.kitchen'] | random }}
+      data:
+        brightness: "{{ range(100, 255) | random }}"
+    # Turn off after random time
+    - delay:
+        minutes: "{{ range(5, 30) | random }}"
+    - service: light.turn_off
+      target:
+        entity_id: all
+
+# ============================================
+# MAINTENANCE ALERTS
+# ============================================
+
+# Weekly battery check
+- id: alarm_weekly_battery_check
+  alias: "Alarm: Weekly Battery Level Check"
+  trigger:
+    - platform: time
+      at: "09:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - mon
+  action:
+    - service: notify.mobile_app_admin
+      data:
+        title: "🔋 Weekly Battery Report"
+        message: >
+          {% set low_batteries = states.sensor 
+            | selectattr('attributes.device_class', 'eq', 'battery')
+            | selectattr('state', 'lt', '20')
+            | map(attribute='name') | list %}
+          {% if low_batteries | length > 0 %}
+            Low batteries detected: {{ low_batteries | join(', ') }}
+          {% else %}
+            All batteries are healthy
+          {% endif %}
+
+# Monthly system test
+- id: alarm_monthly_test
+  alias: "Alarm: Monthly System Test"
+  trigger:
+    - platform: time
+      at: "10:00:00"
+  condition:
+    - condition: template
+      value_template: "{{ now().day == 1 }}"  # First of month
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.alarm_siren
+    - delay:
+        seconds: 3
+    - service: switch.turn_off
+      target:
+        entity_id: switch.alarm_siren
+    - service: notify.mobile_app_all
+      data:
+        title: "🔧 Monthly Test"
+        message: "Alarm system test completed successfully"
+
+# ============================================
+# GUEST MODE
+# ============================================
+
+# Create temporary guest code
+script:
+  create_guest_code:
+    alias: "Create Temporary Guest Code"
+    sequence:
+      - service: secure_alarm.add_user
+        data:
+          name: "Guest - {{ now().strftime('%Y-%m-%d') }}"
+          pin: "{{ range(100000, 999999) | random }}"
+          admin_pin: !secret alarm_admin_pin
+          is_admin: false
+      - service: notify.mobile_app_admin
+        data:
+          title: "🔑 Guest Code Created"
+          message: "Temporary guest code: {{ states('sensor.last_guest_code') }}"
+      # Auto-delete after 24 hours
+      - delay:
+          hours: 24
+      - service: secure_alarm.remove_user
+        data:
+          user_id: "{{ states('sensor.last_guest_user_id') }}"
+          admin_pin: !secret alarm_admin_pin
+
+# ============================================
+# EMERGENCY PROTOCOLS
+# ============================================
+
+# Panic button
+- id: alarm_panic_button
+  alias: "Alarm: Panic Button Activated"
+  trigger:
+    - platform: state
+      entity_id: input_button.panic
+      to: "on"
+  action:
+    # Trigger alarm
+    - service: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.secure_alarm
+    # Turn on all lights
+    - service: light.turn_on
+      target:
+        entity_id: all
+      data:
+        brightness: 255
+    # Unlock doors for escape
+    - service: lock.unlock
+      target:
+        entity_id: all
+    # Send emergency notification
+    - service: notify.mobile_app_all
+      data:
+        title: "🚨 PANIC BUTTON"
+        message: "Emergency! Panic button activated at {{ now().strftime('%I:%M %p') }}"
+        data:
+          priority: high
+          ttl: 0
+    # Call emergency contacts
+    - service: notify.sms
+      data:
+        target: !secret emergency_contact
+        message: "EMERGENCY: Panic button activated at home"
+
+# Fire alarm integration
+- id: alarm_fire_alarm_response
+  alias: "Alarm: Fire Alarm Response"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.smoke_detector
+      to: "on"
+  action:
+    # Disarm alarm (allow exit)
+    - service: secure_alarm.disarm
+      data:
+        pin: !secret alarm_automation_pin
+        code: "fire_emergency"
+    # Unlock all doors
+    - service: lock.unlock
+      target:
+        entity_id: all
+    # Open garage
+    - service: cover.open_cover
+      target:
+        entity_id: cover.garage_door
+    # Turn on path lights
+    - service: light.turn_on
+      target:
+        entity_id: 
+          - light.hallway
+          - light.stairway
+          - light.exit_path
+      data:
+        brightness: 255
+    # Alert everyone
+    - service: notify.mobile_app_all
+      data:
+        title: "🔥 FIRE ALARM"
+        message: "Smoke detected! Alarm disarmed for evacuation."
+        data:
+          priority: high
