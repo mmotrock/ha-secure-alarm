@@ -4,5 +4,7 @@
   "domains": ["alarm_control_panel", "sensor", "binary_sensor"],
   "homeassistant": "2024.1.0",
   "iot_class": "Local Polling",
-  "country": ["US", "CA", "GB", "AU", "NZ", "IE"]
+  "country": ["US", "CA", "GB", "AU", "NZ", "IE"],
+  "hide_default_branch": true,
+  "zip_release": true
 }
