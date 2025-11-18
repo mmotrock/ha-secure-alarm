@@ -9,17 +9,15 @@ from homeassistant.components.alarm_control_panel import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import (
+
+from .const import (
+    DOMAIN,
     STATE_ALARM_DISARMED,
     STATE_ALARM_ARMED_HOME,
     STATE_ALARM_ARMED_AWAY,
     STATE_ALARM_PENDING,
     STATE_ALARM_TRIGGERED,
-)
-
-from .const import (
-    DOMAIN,
-    STATE_ARMING,
+    STATE_ALARM_ARMING,
     ATTR_CHANGED_BY,
     ATTR_CODE_FORMAT,
     ATTR_ZONES_BYPASSED,
@@ -115,7 +113,7 @@ class SecureAlarmPanel(AlarmControlPanelEntity):
         coordinator_state = self._coordinator.state
         
         # Map our custom ARMING state to HA's standard states
-        if coordinator_state == STATE_ARMING:
+        if coordinator_state == STATE_ALARM_ARMING:
             return STATE_ALARM_ARMING
         
         return coordinator_state

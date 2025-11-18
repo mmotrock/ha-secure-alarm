@@ -76,7 +76,7 @@ entry_points:
 ### Entry Point Options
 
 | Option | Type | Required | Default | Description |
-|--------|------|----------|---------|-------------|
+|--------|------|----------|-   --------|-------------|
 | `entity_id` | string | Yes | - | Lock or cover entity ID |
 | `name` | string | Yes | - | Display name |
 | `type` | string | Yes | - | `door` or `garage` |

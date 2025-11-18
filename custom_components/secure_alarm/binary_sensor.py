@@ -8,9 +8,8 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import STATE_ALARM_DISARMED
 
-from .const import DOMAIN
+from .const import DOMAIN, STATE_ALARM_DISARMED, STATE_ALARM_TRIGGERED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +87,6 @@ class AlarmTriggeredBinarySensor(BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return true if alarm is triggered."""
-        from homeassistant.const import STATE_ALARM_TRIGGERED
         return self._coordinator.state == STATE_ALARM_TRIGGERED
     
     @property

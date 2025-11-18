@@ -2,6 +2,14 @@
 
 DOMAIN = "secure_alarm"
 
+# Alarm states (defined as strings for compatibility)
+STATE_ALARM_DISARMED = "disarmed"
+STATE_ALARM_ARMED_HOME = "armed_home"
+STATE_ALARM_ARMED_AWAY = "armed_away"
+STATE_ALARM_PENDING = "pending"
+STATE_ALARM_TRIGGERED = "triggered"
+STATE_ALARM_ARMING = "arming"
+
 # Configuration
 CONF_DB_PATH = "db_path"
 CONF_ENTRY_DELAY = "entry_delay"
@@ -11,6 +19,10 @@ CONF_TRIGGER_DOORS = "trigger_doors"
 CONF_NOTIFICATION_MOBILE = "notification_mobile"
 CONF_NOTIFICATION_SMS = "notification_sms"
 CONF_SMS_NUMBERS = "sms_numbers"
+CONF_LOCK_DELAY_HOME = "lock_delay_home"
+CONF_LOCK_DELAY_AWAY = "lock_delay_away"
+CONF_CLOSE_DELAY_HOME = "close_delay_home"
+CONF_CLOSE_DELAY_AWAY = "close_delay_away"
 
 # Defaults
 DEFAULT_ENTRY_DELAY = 30  # seconds

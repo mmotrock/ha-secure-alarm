@@ -1,5 +1,5 @@
 /**
- * Secure Alarm Badge Card
+ * Secure Alarm Badge Card - Updated with Admin Button
  * Custom Lovelace card for Secure Alarm System
  * 
  * Installation:
@@ -15,6 +15,7 @@ class SecureAlarmCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._pin = '';
     this._showInterface = false;
+    this._showAdmin = false;
   }
 
   setConfig(config) {
@@ -63,6 +64,37 @@ class SecureAlarmCard extends HTMLElement {
         }
         .badge-container:hover {
           transform: scale(1.05);
+        }
+        .admin-btn {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          width: 48px;
+          height: 48px;
+          background: rgba(255, 255, 255, 0.95);
+          border: 2px solid #667eea;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          z-index: 10;
+          transition: all 0.3s;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .admin-btn:hover {
+          transform: scale(1.1) rotate(90deg);
+          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+          background: #667eea;
+        }
+        .admin-btn:hover svg {
+          color: white;
+        }
+        .admin-btn svg {
+          width: 28px;
+          height: 28px;
+          color: #667eea;
+          transition: all 0.3s;
         }
         .glow-outer {
           position: absolute;
@@ -324,7 +356,7 @@ class SecureAlarmCard extends HTMLElement {
           50% { opacity: 0.5; }
         }
       </style>
-      ${this._showInterface ? this.renderInterface() : this.renderBadge()}
+      ${this._showAdmin ? this.renderAdmin() : (this._showInterface ? this.renderInterface() : this.renderBadge())}
     `;
 
     this.attachEventListeners();
@@ -340,6 +372,11 @@ class SecureAlarmCard extends HTMLElement {
       <ha-card>
         <div class="card-content">
           <div class="badge-container" data-action="badge-click">
+            <button class="admin-btn" data-action="open-admin" title="Admin Panel">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+            </button>
             <div class="glow-outer ${color}"></div>
             <div class="badge-main">
               <div class="badge-icon-container">
@@ -363,6 +400,23 @@ class SecureAlarmCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+  }
+
+  renderAdmin() {
+    // Create admin panel element if it doesn't exist
+    if (!this._adminPanel) {
+      this._adminPanel = document.createElement('secure-alarm-admin');
+      this._adminPanel.setConfig({ entity: this.config.entity });
+      this._adminPanel.hass = this._hass;
+      this._adminPanel.addEventListener('close-admin', () => {
+        this._showAdmin = false;
+        this.render();
+      });
+    } else {
+      this._adminPanel.hass = this._hass;
+    }
+    
+    return `<div id="admin-container"></div>`;
   }
 
   renderEntryPoints(entryPoints) {
@@ -561,58 +615,92 @@ class SecureAlarmCard extends HTMLElement {
   }
 
   attachEventListeners() {
-    this.shadowRoot.querySelectorAll('[data-action]').forEach(el => {
+    // Badge click (main area, not admin button)
+    const badgeMain = this.shadowRoot.querySelector('.badge-main');
+    if (badgeMain) {
+      badgeMain.addEventListener('click', () => {
+        this._showInterface = true;
+        this.render();
+      });
+    }
+
+    // Admin button
+    this.shadowRoot.querySelectorAll('[data-action="open-admin"]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const action = el.dataset.action;
-        
-        switch(action) {
-          case 'badge-click':
-            this._showInterface = true;
-            this.render();
-            break;
-          case 'close':
-            this._showInterface = false;
-            this._pin = '';
-            this.render();
-            break;
-          case 'number':
-            if (this._pin.length < 8) {
-              this._pin += el.dataset.value;
-              this.render();
-            }
-            break;
-          case 'clear':
-            this._pin = '';
-            this.render();
-            break;
-          case 'arm-home':
-            this.callService('secure_alarm', 'arm_home', { pin: '123456' });
-            this._showInterface = false;
-            this.render();
-            break;
-          case 'arm-away':
-            this.callService('secure_alarm', 'arm_away', { pin: '123456' });
-            this._showInterface = false;
-            this.render();
-            break;
-          case 'disarm':
-            if (this._pin.length >= 6) {
-              this.callService('secure_alarm', 'disarm', { pin: this._pin });
-              this._showInterface = false;
-              this._pin = '';
-              this.render();
-            }
-            break;
-          case 'toggle-entry':
-            const entityId = el.dataset.entity;
-            const entity = this._hass.states[entityId];
-            if (entity) {
-              const domain = entityId.split('.')[0];
-              const service = entity.state === 'locked' ? 'unlock' : 'lock';
-              this.callService(domain, service, { entity_id: entityId });
-            }
-            break;
+        this._showAdmin = true;
+        this.render();
+        // Mount the admin panel
+        const container = this.shadowRoot.querySelector('#admin-container');
+        if (container && this._adminPanel) {
+          container.appendChild(this._adminPanel);
+        }
+      });
+    });
+
+    // Close button
+    this.shadowRoot.querySelectorAll('[data-action="close"]').forEach(el => {
+      el.addEventListener('click', () => {
+        this._showInterface = false;
+        this._pin = '';
+        this.render();
+      });
+    });
+
+    // Keypad
+    this.shadowRoot.querySelectorAll('[data-action="number"]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (this._pin.length < 8) {
+          this._pin += el.dataset.value;
+          this.render();
+        }
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('[data-action="clear"]').forEach(el => {
+      el.addEventListener('click', () => {
+        this._pin = '';
+        this.render();
+      });
+    });
+
+    // Arm actions
+    this.shadowRoot.querySelectorAll('[data-action="arm-home"]').forEach(el => {
+      el.addEventListener('click', () => {
+        this.callService('secure_alarm', 'arm_home', { pin: '123456' });
+        this._showInterface = false;
+        this.render();
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('[data-action="arm-away"]').forEach(el => {
+      el.addEventListener('click', () => {
+        this.callService('secure_alarm', 'arm_away', { pin: '123456' });
+        this._showInterface = false;
+        this.render();
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('[data-action="disarm"]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (this._pin.length >= 6) {
+          this.callService('secure_alarm', 'disarm', { pin: this._pin });
+          this._showInterface = false;
+          this._pin = '';
+          this.render();
+        }
+      });
+    });
+
+    // Entry point toggles
+    this.shadowRoot.querySelectorAll('[data-action="toggle-entry"]').forEach(el => {
+      el.addEventListener('click', () => {
+        const entityId = el.dataset.entity;
+        const entity = this._hass.states[entityId];
+        if (entity) {
+          const domain = entityId.split('.')[0];
+          const service = entity.state === 'locked' ? 'unlock' : 'lock';
+          this.callService(domain, service, { entity_id: entityId });
         }
       });
     });
@@ -629,5 +717,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'secure-alarm-card',
   name: 'Secure Alarm Badge Card',
-  description: 'Badge-style alarm control with entry point management'
+  description: 'Badge-style alarm control with admin panel and entry point management'
 });

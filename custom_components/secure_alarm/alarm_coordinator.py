@@ -7,21 +7,19 @@ from typing import Optional, Dict, List, Any, Callable
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time, async_call_later
 from homeassistant.util import dt as dt_util
-from homeassistant.const import (
+
+from .const import (
+    DOMAIN,
     STATE_ALARM_DISARMED,
     STATE_ALARM_ARMED_HOME,
     STATE_ALARM_ARMED_AWAY,
     STATE_ALARM_PENDING,
     STATE_ALARM_TRIGGERED,
-)
-
-from .const import (
-    DOMAIN,
+    STATE_ALARM_ARMING,
     EVENT_ALARM_ARMED,
     EVENT_ALARM_DISARMED,
     EVENT_ALARM_TRIGGERED,
     EVENT_ALARM_DURESS,
-    STATE_ARMING,
     ZONE_TYPE_ENTRY,
 )
 from .database import AlarmDatabase
@@ -134,107 +132,122 @@ class AlarmCoordinator:
     
     async def arm_away(self, pin: str, user_code: Optional[str] = None) -> Dict[str, Any]:
         """Arm the system in away mode."""
-        user = await self._authenticate(pin, user_code)
-        
-        if not user:
-            return {"success": False, "message": "Invalid PIN"}
-        
-        if self._state in [STATE_ALARM_ARMED_AWAY, STATE_ARMING]:
-            return {"success": False, "message": "System already arming or armed"}
-        
-        # Start exit delay
-        config = await self.hass.async_add_executor_job(self.database.get_config)
-        exit_delay = config.get('exit_delay', 60)
-        
-        await self._set_state(STATE_ARMING, user['name'])
-        
-        # Cancel any existing timers
-        self._cancel_timers()
-        
-        # Set exit timer
-        self._exit_timer = async_call_later(
-            self.hass,
-            exit_delay,
-            self._complete_arming_away
-        )
-        
-        # Execute arming actions (lock doors, close garage)
-        await self._execute_arming_actions()
-        
-        _LOGGER.info(f"Arming away initiated by {user['name']}, {exit_delay}s delay")
-        
-        return {
-            "success": True,
-            "message": f"Arming away in {exit_delay} seconds",
-            "delay": exit_delay
-        }
-    
+        try:
+            user = await self._authenticate(pin, user_code)
+            
+            if not user:
+                return {"success": False, "message": "Invalid PIN"}
+            
+            if self._state in [STATE_ALARM_ARMED_AWAY, STATE_ALARM_ARMING]:
+                return {"success": False, "message": "System already arming or armed"}
+            
+            # Start exit delay
+            config = await self.hass.async_add_executor_job(self.database.get_config)
+            exit_delay = config.get('exit_delay', 60)
+            
+            await self._set_state(STATE_ALARM_ARMING, user['name'])
+            
+            # Cancel any existing timers
+            self._cancel_timers()
+            
+            # Set exit timer
+            self._exit_timer = async_call_later(
+                self.hass,
+                exit_delay,
+                self._complete_arming_away
+            )
+            
+            # TODO: Re-enable arming actions when locks/covers are configured
+            # self.hass.async_create_task(self._execute_arming_actions())
+            
+            _LOGGER.info(f"Arming away initiated by {user['name']}, {exit_delay}s delay")
+            
+            return {
+                "success": True,
+                "message": f"Arming away in {exit_delay} seconds",
+                "delay": exit_delay
+            }
+        except Exception as e:
+            _LOGGER.error(f"Error in arm_away: {e}", exc_info=True)
+            return {"success": False, "message": f"Error: {str(e)}"}
+
     async def arm_home(self, pin: str, user_code: Optional[str] = None) -> Dict[str, Any]:
         """Arm the system in home mode."""
-        user = await self._authenticate(pin, user_code)
-        
-        if not user:
-            return {"success": False, "message": "Invalid PIN"}
-        
-        if self._state == STATE_ALARM_ARMED_HOME:
-            return {"success": False, "message": "System already armed home"}
-        
-        # Cancel any existing timers
-        self._cancel_timers()
-        
-        # Arm home has no exit delay (you're already home)
-        await self._set_state(STATE_ALARM_ARMED_HOME, user['name'])
-        
-        # Fire armed event
-        self.hass.bus.async_fire(EVENT_ALARM_ARMED, {
-            "mode": "armed_home",
-            "changed_by": user['name'],
-        })
-        
-        _LOGGER.info(f"Armed home by {user['name']}")
-        
-        return {"success": True, "message": "Armed home"}
+        try:
+            user = await self._authenticate(pin, user_code)
+            
+            if not user:
+                return {"success": False, "message": "Invalid PIN"}
+            
+            if self._state == STATE_ALARM_ARMED_HOME:
+                return {"success": False, "message": "System already armed home"}
+            
+            # Cancel any existing timers
+            self._cancel_timers()
+            
+            # Arm home has no exit delay (you're already home)
+            await self._set_state(STATE_ALARM_ARMED_HOME, user['name'])
+            
+            # Fire armed event
+            self.hass.bus.async_fire(EVENT_ALARM_ARMED, {
+                "mode": "armed_home",
+                "changed_by": user['name'],
+            })
+            
+            _LOGGER.info(f"Armed home by {user['name']}")
+            
+            return {"success": True, "message": "Armed home"}
+        except Exception as e:
+            _LOGGER.error(f"Error in arm_home: {e}", exc_info=True)
+            return {"success": False, "message": f"Error: {str(e)}"}
     
     async def disarm(self, pin: str, user_code: Optional[str] = None) -> Dict[str, Any]:
         """Disarm the system."""
-        user = await self._authenticate(pin, user_code)
-        
-        if not user:
-            return {"success": False, "message": "Invalid PIN"}
-        
-        # Cancel all timers
-        self._cancel_timers()
-        
-        # If duress code, appear to disarm but alert
-        if user['is_duress']:
-            await self._set_state(STATE_ALARM_DISARMED, user['name'])
-            # Duress notification already sent in _authenticate
-        else:
-            await self._set_state(STATE_ALARM_DISARMED, user['name'])
-        
-        self._triggered_by = None
-        self._bypassed_zones.clear()
-        
-        # Fire disarmed event
-        self.hass.bus.async_fire(EVENT_ALARM_DISARMED, {
-            "changed_by": user['name'],
-        })
-        
-        _LOGGER.info(f"Disarmed by {user['name']}")
-        
-        return {"success": True, "message": "Disarmed"}
+        try:
+            user = await self._authenticate(pin, user_code)
+            
+            if not user:
+                return {"success": False, "message": "Invalid PIN"}
+            
+            # Cancel all timers
+            self._cancel_timers()
+            
+            # If duress code, appear to disarm but alert
+            if user['is_duress']:
+                await self._set_state(STATE_ALARM_DISARMED, user['name'])
+                # Duress notification already sent in _authenticate
+            else:
+                await self._set_state(STATE_ALARM_DISARMED, user['name'])
+            
+            self._triggered_by = None
+            self._bypassed_zones.clear()
+            
+            # Fire disarmed event
+            self.hass.bus.async_fire(EVENT_ALARM_DISARMED, {
+                "changed_by": user['name'],
+            })
+            
+            _LOGGER.info(f"Disarmed by {user['name']}")
+            
+            return {"success": True, "message": "Disarmed"}
+        except Exception as e:
+            _LOGGER.error(f"Error in disarm: {e}", exc_info=True)
+            return {"success": False, "message": f"Error: {str(e)}"}
     
     async def _complete_arming_away(self, _now: datetime = None) -> None:
         """Complete the arming process after exit delay."""
-        await self._set_state(STATE_ALARM_ARMED_AWAY, self._changed_by)
-        
-        # Fire armed event
-        self.hass.bus.async_fire(EVENT_ALARM_ARMED, {
-            "mode": "armed_away",
-            "changed_by": self._changed_by,
-        })
-        
-        _LOGGER.info("Armed away complete")
+        try:
+            await self._set_state(STATE_ALARM_ARMED_AWAY, self._changed_by)
+            
+            # Fire armed event
+            self.hass.bus.async_fire(EVENT_ALARM_ARMED, {
+                "mode": "armed_away",
+                "changed_by": self._changed_by,
+            })
+            
+            _LOGGER.info("Armed away complete")
+        except Exception as e:
+            _LOGGER.error(f"Error completing arming away: {e}", exc_info=True)
     
     async def zone_triggered(self, zone_entity_id: str, zone_name: str) -> None:
         """Handle zone trigger."""
@@ -349,23 +362,88 @@ class AlarmCoordinator:
     
     async def _execute_arming_actions(self) -> None:
         """Execute actions when arming (lock doors, close garage)."""
-        # Call service to lock all doors
-        await self.hass.services.async_call(
-            'lock',
-            'lock',
-            {'entity_id': 'all'},
-            blocking=False
-        )
-        
-        # Call service to close garage doors
-        await self.hass.services.async_call(
-            'cover',
-            'close_cover',
-            {'entity_id': 'all'},
-            blocking=False
-        )
-        
-        _LOGGER.info("Arming actions executed (doors locked, garage closed)")
+        try:
+            config = await self.hass.async_add_executor_job(self.database.get_config)
+            
+            # Determine delays based on current state
+            if self._state == STATE_ALARM_ARMED_HOME:
+                lock_delay = config.get('lock_delay_home', 0)
+                close_delay = config.get('close_delay_home', 0)
+            else:
+                lock_delay = config.get('lock_delay_away', 60)
+                close_delay = config.get('close_delay_away', 60)
+            
+            # Schedule lock action
+            if lock_delay > 0:
+                async_call_later(
+                    self.hass,
+                    lock_delay,
+                    lambda _: self.hass.async_create_task(self._lock_all_doors())
+                )
+            else:
+                # Run immediately but don't block
+                self.hass.async_create_task(self._lock_all_doors())
+            
+            # Schedule garage close action
+            if close_delay > 0:
+                async_call_later(
+                    self.hass,
+                    close_delay,
+                    lambda _: self.hass.async_create_task(self._close_all_garages())
+                )
+            else:
+                # Run immediately but don't block
+                self.hass.async_create_task(self._close_all_garages())
+            
+            _LOGGER.info(f"Arming actions scheduled: lock in {lock_delay}s, close in {close_delay}s")
+        except Exception as e:
+            _LOGGER.error(f"Error executing arming actions: {e}", exc_info=True)
+    
+    async def _lock_all_doors(self) -> None:
+        """Lock all doors."""
+        try:
+            # Check if any lock entities exist
+            lock_entities = [
+                entity_id for entity_id in self.hass.states.async_entity_ids('lock')
+            ]
+            
+            if not lock_entities:
+                _LOGGER.debug("No lock entities found, skipping door locking")
+                return
+            
+            _LOGGER.info(f"Locking {len(lock_entities)} door(s)")
+            await self.hass.services.async_call(
+                'lock',
+                'lock',
+                {'entity_id': lock_entities},
+                blocking=False
+            )
+            _LOGGER.info("All doors locked")
+        except Exception as e:
+            _LOGGER.error(f"Error locking doors: {e}", exc_info=True)
+
+    async def _close_all_garages(self) -> None:
+        """Close all garage doors."""
+        try:
+            # Check if any cover entities exist (filtering for garages if possible)
+            cover_entities = [
+                entity_id for entity_id in self.hass.states.async_entity_ids('cover')
+            ]
+            
+            if not cover_entities:
+                _LOGGER.debug("No cover entities found, skipping garage closing")
+                return
+            
+            _LOGGER.info(f"Closing {len(cover_entities)} cover(s)")
+            await self.hass.services.async_call(
+                'cover',
+                'close_cover',
+                {'entity_id': cover_entities},
+                blocking=False
+            )
+            _LOGGER.info("All garage doors closed")
+        except Exception as e:
+            _LOGGER.error(f"Error closing garages: {e}", exc_info=True)
     
     async def _send_alarm_notification(self, zone_name: str) -> None:
         """Send alarm trigger notifications."""
@@ -433,7 +511,9 @@ class AlarmCoordinator:
             _LOGGER.error(f"Failed to send SMS: {e}")
     
     async def add_user(self, name: str, pin: str, admin_pin: str,
-                      is_admin: bool = False, is_duress: bool = False) -> Dict[str, Any]:
+                  is_admin: bool = False, is_duress: bool = False,
+                  phone: Optional[str] = None, email: Optional[str] = None,
+                  has_separate_lock_pin: bool = False, lock_pin: Optional[str] = None) -> Dict[str, Any]:
         """Add a new user."""
         # Verify admin PIN
         admin_user = await self._authenticate(admin_pin)
@@ -445,13 +525,21 @@ class AlarmCoordinator:
         if len(pin) < 6 or len(pin) > 8:
             return {"success": False, "message": "PIN must be 6-8 characters"}
         
+        # Validate lock PIN if provided
+        if has_separate_lock_pin and lock_pin and (len(lock_pin) < 6 or len(lock_pin) > 8):
+            return {"success": False, "message": "Lock PIN must be 6-8 characters"}
+        
         # Add user
         user_id = await self.hass.async_add_executor_job(
             self.database.add_user,
             name,
             pin,
             is_admin,
-            is_duress
+            is_duress,
+            phone,
+            email,
+            has_separate_lock_pin,
+            lock_pin
         )
         
         if user_id:
@@ -517,3 +605,40 @@ class AlarmCoordinator:
             return {"success": True, "message": "Configuration updated"}
         else:
             return {"success": False, "message": "Failed to update configuration"}
+        
+    async def update_user(self, user_id: int, name: Optional[str], pin: Optional[str],
+                     phone: Optional[str], email: Optional[str], is_admin: bool,
+                     has_separate_lock_pin: bool, lock_pin: Optional[str],
+                     admin_pin: str) -> Dict[str, Any]:
+        """Update a user."""
+        # Verify admin PIN
+        admin_user = await self._authenticate(admin_pin)
+        
+        if not admin_user or not admin_user['is_admin']:
+            return {"success": False, "message": "Admin authentication required"}
+        
+        # Validate PIN if provided
+        if pin and (len(pin) < 6 or len(pin) > 8):
+            return {"success": False, "message": "PIN must be 6-8 characters"}
+        
+        # Validate lock PIN if provided
+        if lock_pin and (len(lock_pin) < 6 or len(lock_pin) > 8):
+            return {"success": False, "message": "Lock PIN must be 6-8 characters"}
+        
+        # Update user
+        success = await self.hass.async_add_executor_job(
+            self.database.update_user,
+            user_id,
+            name,
+            pin,
+            is_admin,
+            phone,
+            email,
+            has_separate_lock_pin,
+            lock_pin
+        )
+        
+        if success:
+            return {"success": True, "message": f"User updated"}
+        else:
+            return {"success": False, "message": "Failed to update user"}
